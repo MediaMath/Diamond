@@ -31,6 +31,9 @@ class Table(object):
         self.name = name
         self.stats = stats
 
+def clean_key(key):
+    return key.replace(' ', '_')
+
 def cfstats():
     output = subprocess.check_output(['nodetool', 'cfstats'])
     lines = [line for line in output.splitlines()
@@ -49,14 +52,15 @@ def cfstats():
         elif tab_count == 1:
             key, value = parse_line(line)
             if not math.isnan(value):
-                keyspaces[-1].stats.append(parse_line(line))
+                key, value = parse_line(line)
+                keyspaces[-1].stats.append((clean_key(key), value))
         elif tab_count == 2:
             key, value = parse_line(line)
             if key == 'Table':
                 keyspaces[-1].tables.append(Table(value, []))
             else:
                 if not math.isnan(value):
-                    keyspaces[-1].tables[-1].stats.append((key, value))
+                    keyspaces[-1].tables[-1].stats.append((clean_key(key), value))
         else:
             raise ValueError
 
