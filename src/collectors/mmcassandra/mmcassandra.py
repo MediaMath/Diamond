@@ -32,7 +32,7 @@ class Table(object):
         self.stats = stats
 
 def clean_key(key):
-    return key.replace(' ', '_')
+    return key.replace(' ', '_').replace(',', '_').replace('(', '').replace(')', '')
 
 def cfstats():
     output = subprocess.check_output(['nodetool', 'cfstats'])
