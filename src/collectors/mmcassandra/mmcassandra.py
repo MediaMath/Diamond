@@ -34,43 +34,12 @@ class Table(object):
 def clean_key(key):
     return key.replace(' ', '_').replace(',', '_').replace('(', '').replace(')', '')
 
-def cfstats():
-    output = subprocess.check_output(['nodetool', 'cfstats'])
-    lines = [line for line in output.splitlines()
-             if line and (line != '----------------')]
-
-    # cfstats output is structured in a very specific way: all lines are
-    # key: value pairs prefixed by tabs. everything indented belongs to the 
-
-    keyspaces = []
-    for line in lines:
-        tab_count = len(line) - len(line.lstrip('\t'))
-        if tab_count == 0:
-            key, value = parse_line(line)
-            assert key == 'Keyspace'
-            keyspaces.append(Keyspace(value, [], []))
-        elif tab_count == 1:
-            key, value = parse_line(line)
-            if not math.isnan(value):
-                key, value = parse_line(line)
-                keyspaces[-1].stats.append((clean_key(key), value))
-        elif tab_count == 2:
-            key, value = parse_line(line)
-            if key == 'Table':
-                keyspaces[-1].tables.append(Table(value, []))
-            else:
-                if not math.isnan(value):
-                    keyspaces[-1].tables[-1].stats.append((clean_key(key), value))
-        else:
-            raise ValueError
-
-    return keyspaces
 
 bad_keyspaces = ('system', 'system_traces')
 
 class ColumnFamilyStatsCollector(diamond.collector.Collector):
     def collect(self):
-        for keyspace in cfstats():
+        for keyspace in self.cfstats():
             if keyspace.name not in bad_keyspaces:
                 for (key, value) in keyspace.stats:
                     name = 'cassandra.cfstats.{}.{}'.format(
@@ -83,4 +52,37 @@ class ColumnFamilyStatsCollector(diamond.collector.Collector):
                         self.publish(name, value)
 
 
+    def cfstats(self):
+        output = subprocess.check_output(['nodetool', 'cfstats'])
+        lines = [line for line in output.splitlines()
+                 if line and (line != '----------------')]
 
+        # cfstats output is structured in a very specific way: all lines are
+        # key: value pairs prefixed by tabs. everything indented belongs to the
+
+        keyspaces = []
+        for line in lines:
+            try:
+                tab_count = len(line) - len(line.lstrip('\t'))
+                if tab_count == 0:
+                    key, value = parse_line(line)
+                    assert key == 'Keyspace'
+                    keyspaces.append(Keyspace(value, [], []))
+                elif tab_count == 1:
+                    key, value = parse_line(line)
+                    if not math.isnan(value):
+                        key, value = parse_line(line)
+                        keyspaces[-1].stats.append((clean_key(key), value))
+                elif tab_count == 2:
+                    key, value = parse_line(line)
+                    if key == 'Table':
+                        keyspaces[-1].tables.append(Table(value, []))
+                    else:
+                        if not math.isnan(value):
+                            keyspaces[-1].tables[-1].stats.append((clean_key(key), value))
+                else:
+                    raise ValueError
+            except ValueError:
+                self.log.error("Unable to parse line: %s" % line)
+
+        return keyspaces
