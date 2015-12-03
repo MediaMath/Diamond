@@ -110,14 +110,20 @@ class ColumnFamilyStatsCollector(diamond.collector.Collector):
                         if not math.isnan(value):
                             key_name = ks_name + table_name
                             if key == "Local read count":
-                                value = self.get_periodic_rw(
+                                rate_value = self.get_periodic_rw(
                                             ColumnFamilyStatsCollector.last_read,
                                             key_name, value)
 
+                                keyspaces[-1].tables[-1].stats.append(
+                                    (clean_key("Local_read_rate"), rate_value))
+
                             elif key == "Local write count":
-                                value = self.get_periodic_rw(
+                                rate_value = self.get_periodic_rw(
                                             ColumnFamilyStatsCollector.last_write,
                                             key_name, value)
+
+                                keyspaces[-1].tables[-1].stats.append(
+                                    (clean_key("Local_write_rate"), rate_value))
 
                             keyspaces[-1].tables[-1].stats.append((clean_key(key), value))
                 else:
